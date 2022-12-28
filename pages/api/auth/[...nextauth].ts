@@ -2,8 +2,8 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import type { NextAuthOptions } from 'next-auth'
 import NextAuth from 'next-auth/next'
 import GithubProvider from 'next-auth/providers/github'
-import GoogleProvider from 'next-auth/providers/google'
-import TwitchProvider from 'next-auth/providers/twitch'
+// import GoogleProvider from 'next-auth/providers/google'
+// import TwitchProvider from 'next-auth/providers/twitch'
 
 import prisma from '../../../utils/prisma'
 
@@ -19,16 +19,16 @@ export const authOptions: NextAuthOptions = {
 				image: profile.avatar_url,
 			}),
 		}),
-		TwitchProvider({
-			clientId: process.env.TWITCH_CLIENT_ID!,
-			clientSecret: process.env.TWITCH_CLIENT_SECRET!,
-		}),
-		GoogleProvider({
-			clientId: process.env.GOOGLE_CLIENT_ID!,
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-		}),
+		// TwitchProvider({
+		// 	clientId: process.env.TWITCH_CLIENT_ID!,
+		// 	clientSecret: process.env.TWITCH_CLIENT_SECRET!,
+		// }),
+		// GoogleProvider({
+		// 	clientId: process.env.GOOGLE_CLIENT_ID!,
+		// 	clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+		// }),
 	],
-	secret: process.env.AUTH_SECRET,
+	secret: process.env.NEXTAUTH_SECRET,
 	adapter: PrismaAdapter(prisma),
 	callbacks: {
 		session: ({ session, user }) => ({

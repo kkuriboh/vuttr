@@ -1,17 +1,71 @@
-import { GetStaticProps } from 'next'
-import Head from 'next/head'
+import { useCallback, useEffect, useState } from 'react'
+import { GetServerSideProps } from 'next'
+import { Popover } from '@headlessui/react'
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/solid'
+import { Tool as ToolType, User } from '@prisma/client'
+import { getSession, signOut } from 'next-auth/react'
+import Head from 'next/head'
 
 import Tool from '../components/tool'
 
-import { tool } from '../types/tool'
 import prisma from '../utils/prisma'
+import AddTool from '../components/add_tool'
+import { trpc } from '../utils/trpc'
 
 type props = {
-	tools: tool[]
+	user: User & {
+		tools: ToolType[]
+	}
 }
 
-export default function Home({ tools }: props) {
+export default function Home({ user }: props) {
+	const get_tools_mutation = trpc.get_tools.useMutation()
+
+	const [tools, set_tools] = useState(user ? user.tools : [])
+	const [filtered_tools, set_filtered_tools] = useState(tools)
+	const [tags_only, set_tags_only] = useState(false)
+	const [filter, set_filter] = useState('')
+
+	useEffect(() => {
+		if (!filter) {
+			set_filtered_tools(tools)
+			return
+		}
+
+		if (tags_only) {
+			set_filtered_tools(
+				tools.filter(
+					(tool) =>
+						tool.tags.filter((tag) => tag.includes(filter)).length >
+						0
+				)
+			)
+			return
+		}
+
+		set_filtered_tools(
+			tools.filter((tool) => {
+				let contains = false
+
+				const check_key = (key: string) => {
+					if (key.includes(filter)) {
+						contains = true
+					}
+				}
+
+				check_key(tool.title)
+				check_key(tool.description)
+				check_key(tool.link)
+				tool.tags.forEach(check_key)
+
+				return contains
+			})
+		)
+	}, [filter, tags_only, tools])
+
+	const query_tools_callback = async () =>
+		set_tools(await get_tools_mutation.mutateAsync({ user_id: user.id }))
+
 	return (
 		<>
 			<Head>
@@ -28,8 +82,20 @@ export default function Home({ tools }: props) {
 			</Head>
 			<main className="grid place-items-center py-12 bg-zinc-100">
 				<header className="grid gap-4 text-left w-[90vw] md:w-[80vw] lg:w-[60vw]">
-					<h1 className="text-6xl">VUTTR</h1>
-					<h2 className="text-2xl">Very Useful Tools to Remember</h2>
+					<div className="flex justify-between items-center">
+						<div>
+							<h1 className="text-6xl">VUTTR</h1>
+							<h2 className="text-2xl">
+								Very Useful Tools to Remember
+							</h2>
+						</div>
+						<button
+							className="text-blue-500 hover:underline transition-all"
+							onClick={() => signOut()}
+						>
+							logoff
+						</button>
+					</div>
 					<div className="flex justify-between items-center my-4">
 						<div className="flex items-center">
 							<label
@@ -42,6 +108,8 @@ export default function Home({ tools }: props) {
 									placeholder="search"
 									id="search"
 									className="focus:outline-none"
+									value={filter}
+									onChange={(e) => set_filter(e.target.value)}
 								/>
 							</label>
 							<input
@@ -49,20 +117,33 @@ export default function Home({ tools }: props) {
 								name="tags_only"
 								id="tags_only"
 								className="mr-2"
+								onClick={() => set_tags_only(!tags_only)}
 							/>
 							<label htmlFor="tags_oly">
 								search in tags only
 							</label>
 						</div>
-						<button className="flex bg-zinc-100 border-2 border-zinc-900 py-1 px-6 btn-shadow">
-							<PlusIcon className="text-zinc-900 stroke-2 stroke-zinc-900 w-6 h-6" />
-							Add
-						</button>
+						<Popover>
+							<Popover.Button className="flex bg-zinc-100 border-2 border-zinc-900 py-1 px-6 btn-shadow">
+								<PlusIcon className="text-zinc-900 stroke-2 stroke-zinc-900 w-6 h-6" />
+								Add
+							</Popover.Button>
+							{user && (
+								<AddTool
+									user_id={user.id}
+									query_tools_callback={query_tools_callback}
+								/>
+							)}
+						</Popover>
 					</div>
 				</header>
 				<div className="flex flex-col gap-4">
-					{tools.map((tool) => (
-						<Tool {...tool} />
+					{filtered_tools.map((tool, index) => (
+						<Tool
+							key={index}
+							{...tool}
+							query_tools_callback={query_tools_callback}
+						/>
 					))}
 				</div>
 			</main>
@@ -70,55 +151,31 @@ export default function Home({ tools }: props) {
 	)
 }
 
-export const getStaticProps: GetStaticProps = async () => ({
-	// props: {
-	// 	tools: await prisma.tool.findMany(),
-	// },
-	props: {
-		tools: [
-			{
-				id: 1,
-				title: 'Notion',
-				link: 'https://notion.so',
-				description:
-					'All in one tool to organize teams and ideas. Write, plan, collaborate, and get organized. ',
-				tags: [
-					'organization',
-					'planning',
-					'collaboration',
-					'writing',
-					'calendar',
-				],
-			},
-			{
-				id: 2,
-				title: 'json-server',
-				link: 'https://github.com/typicode/json-server',
-				description:
-					'Fake REST API based on a json schema. Useful for mocking and creating APIs for front-end devs to consume in coding challenges.',
-				tags: ['api', 'json', 'schema', 'node', 'github', 'rest'],
-			},
-			{
-				id: 3,
-				title: 'fastify',
-				link: 'https://www.fastify.io/',
-				description:
-					'Extremely fast and simple, low-overhead web framework for NodeJS. Supports HTTP2.',
-				tags: [
-					'web',
-					'framework',
-					'node',
-					'http2',
-					'https',
-					'localhost',
-				],
-			},
-			{
-				title: 'test-tool',
-				description: 'test-tool description wow',
-				tags: ['test', 'tool', 'wow', 'such'],
-				id: 5,
-			},
-		],
-	},
-})
+export const getServerSideProps: GetServerSideProps = async (context) => {
+	const session = await getSession(context)
+
+	if (!session || !session.user?.email)
+		return {
+			redirect: { destination: '/login', permanent: false },
+		}
+
+	const user = await prisma.user.findUnique({
+		where: {
+			email: session.user.email,
+		},
+		include: {
+			tools: true,
+		},
+	})
+
+	if (!user)
+		return {
+			redirect: { destination: '/login', permanent: false },
+		}
+
+	return {
+		props: {
+			user,
+		},
+	}
+}
